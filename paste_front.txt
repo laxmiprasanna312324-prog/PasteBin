@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PasteBin — Share Code & Text</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<style>
+:root {
+  --bg: #0d0f14;
+  --bg2: #13161e;
+  --bg3: #1a1e29;
+  --border: #252a38;
+  --border2: #2e3448;
+  --text: #e2e8f0;
+  --text2: #8892aa;
+  --text3: #515d78;
+  --accent: #4f8ef7;
+  --accent2: #7b5cf7;
+  --green: #2ed573;
+  --red: #ff4757;
+  --yellow: #ffd32a;
+  --orange: #ff6b35;
+  --card: #161b27;
+  --radius: 10px;
+  --glow: 0 0 30px rgba(79,142,247,0.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Space Grotesk',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── SPLASH ── */
+#splash{
+  position:fixed;inset:0;
+  background:var(--bg);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  z-index:9999;
+  transition:opacity .6s ease, transform .6s ease;
+}
+#splash.hide{opacity:0;transform:scale(1.05);pointer-events:none}
+.splash-logo{
+  display:flex;align-items:center;gap:16px;
+  margin-bottom:24px;
+}
+.splash-icon{
+  width:72px;height:72px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;
+  box-shadow:0 0 60px rgba(79,142,247,0.5);
+  animation:splashPulse 2s ease-in-out infinite;
+  position:relative;
+}
+.splash-icon::after{
+  content:'';
+  position:absolute;inset:-4px;
+  border-radius:22px;
+  border:2px solid rgba(79,142,247,0.4);
+  animation:splashRing 2s ease-in-out infinite;
+}
+@keyframes splashPulse{
+  0%,100%{transform:scale(1);box-shadow:0 0 40px rgba(79,142,247,0.4)}
+  50%{transform:scale(1.08);box-shadow:0 0 80px rgba(79,142,247,0.7)}
+}
+@keyframes splashRing{
+  0%,100%{transform:scale(1);opacity:.6}
+  50%{transform:scale(1.3);opacity:0}
+}
+.splash-brand{
+  font-size:42px;font-weight:700;
+  background:linear-gradient(135deg,#fff 0%,var(--accent) 50%,var(--accent2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:-1px;
+}
+.splash-tagline{
+  font-family:'JetBrains Mono',monospace;
+  color:var(--text2);font-size:14px;
+  letter-spacing:4px;text-transform:uppercase;
+  animation:blink 1.5s ease-in-out infinite;
+}
+@keyframes blink{
+  0%,100%{opacity:1}50%{opacity:.3}
+}
+.splash-enter-text{
+  margin-top:48px;
+  font-family:'JetBrains Mono',monospace;
+  color:var(--accent);
+  font-size:18px;
+  letter-spacing:2px;
+  animation:fadeInUp 1s ease .8s both;
+  text-align:center;
+}
+.splash-enter-text span{
+  display:inline-block;
+  animation:typeIn .05s ease forwards;
+  opacity:0;
+}
+@keyframes typeIn{to{opacity:1}}
+@keyframes fadeInUp{
+  from{opacity:0;transform:translateY(20px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.splash-bar{
+  width:300px;height:2px;
+  background:var(--border);
+  border-radius:99px;
+  margin-top:32px;
+  overflow:hidden;
+  animation:fadeInUp 1s ease 1s both;
+}
+.splash-bar-fill{
+  height:100%;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  border-radius:99px;
+  animation:loadBar 2s ease 1.2s both;
+}
+@keyframes loadBar{
+  from{width:0}to{width:100%}
+}
+
+/* ── NAV ── */
+nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(13,15,20,.9);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  height:60px;
+  display:flex;align-items:center;gap:16px;
+}
+.nav-brand{
+  display:flex;align-items:center;gap:10px;
+  cursor:pointer;text-decoration:none;
+  flex-shrink:0;
+}
+.nav-icon{
+  width:34px;height:34px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+}
+.nav-brand-text{
+  font-weight:700;font-size:18px;
+  background:linear-gradient(135deg,#fff,var(--accent));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.nav-links{display:flex;align-items:center;gap:4px;margin-left:8px}
+.nav-link{
+  padding:6px 12px;border-radius:7px;
+  color:var(--text2);font-size:14px;font-weight:500;
+  cursor:pointer;transition:.2s;
+  text-decoration:none;
+}
+.nav-link:hover,.nav-link.active{color:var(--text);background:var(--bg3)}
+.nav-spacer{flex:1}
+.nav-search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;padding:6px 12px;
+  transition:.2s;
+}
+.nav-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.15)}
+.nav-search input{
+  background:none;border:none;outline:none;
+  color:var(--text);font-size:13px;width:180px;
+  font-family:'Space Grotesk',sans-serif;
+}
+.nav-search input::placeholder{color:var(--text3)}
+.nav-btn{
+  padding:7px 16px;border-radius:8px;
+  font-size:13px;font-weight:600;
+  cursor:pointer;border:none;
+  transition:.2s;font-family:'Space Grotesk',sans-serif;
+}
+.btn-ghost{background:var(--bg3);color:var(--text2)}
+.btn-ghost:hover{color:var(--text);background:var(--border2)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.user-menu{position:relative}
+.user-avatar{
+  width:34px;height:34px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:14px;color:#fff;cursor:pointer;
+  transition:.2s;border:2px solid transparent;
+}
+.user-avatar:hover{border-color:var(--accent);transform:scale(1.05)}
+.dropdown{
+  position:absolute;top:calc(100% + 8px);right:0;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:6px;
+  min-width:180px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  opacity:0;transform:translateY(-8px);
+  pointer-events:none;transition:.2s;z-index:200;
+}
+.dropdown.show{opacity:1;transform:translateY(0);pointer-events:all}
+.dropdown-item{
+  padding:8px 12px;border-radius:7px;
+  color:var(--text2);font-size:13px;cursor:pointer;
+  transition:.15s;display:flex;align-items:center;gap:8px;
+}
+.dropdown-item:hover{background:var(--bg3);color:var(--text)}
+.dropdown-divider{height:1px;background:var(--border);margin:4px 0}
+
+/* ── PAGES ── */
+.page{display:none;animation:fadeIn .3s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── HOME (NEW PASTE) ── */
+.home-wrap{
+  max-width:960px;margin:0 auto;
+  padding:32px 24px;
+}
+.paste-header{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:24px;
+}
+.paste-header h1{font-size:22px;font-weight:700}
+.paste-header .badge{
+  padding:3px 10px;border-radius:99px;
+  background:rgba(79,142,247,.15);color:var(--accent);
+  font-size:11px;font-weight:600;letter-spacing:.5px;
+  text-transform:uppercase;
+}
+.editor-wrap{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+  box-shadow:var(--glow);
+}
+.editor-toolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg3);
+  flex-wrap:wrap;
+}
+.toolbar-dots{display:flex;gap:6px;flex-shrink:0}
+.dot{width:12px;height:12px;border-radius:50%}
+.dot-r{background:#ff5f57}.dot-y{background:#ffbd2e}.dot-g{background:#28ca41}
+.editor-title-input{
+  flex:1;min-width:120px;
+  background:none;border:none;outline:none;
+  color:var(--text);font-size:14px;font-weight:500;
+  font-family:'Space Grotesk',sans-serif;
+}
+.editor-title-input::placeholder{color:var(--text3)}
+.toolbar-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+.toolbar-select{
+  background:var(--bg2);border:1px solid var(--border);
+  color:var(--text2);border-radius:6px;
+  padding:4px 8px;font-size:12px;
+  font-family:'Space Grotesk',sans-serif;cursor:pointer;
+  transition:.2s;
+}
+.toolbar-select:hover,.toolbar-select:focus{border-color:var(--accent);color:var(--text);outline:none}
+.format-toggle{
+  display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+  overflow:hidden;
+}
+.format-btn{
+  padding:4px 10px;font-size:12px;cursor:pointer;
+  color:var(--text3);border:none;background:none;
+  font-family:'Space Grotesk',sans-serif;transition:.2s;
+}
+.format-btn.active{background:var(--accent);color:#fff}
+#monaco-container{height:420px;width:100%}
+#plain-textarea{
+  width:100%;height:420px;
+  background:var(--bg2);border:none;outline:none;
+  color:var(--text);font-family:'JetBrains Mono',monospace;
+  font-size:14px;line-height:1.7;padding:20px;
+  resize:none;
+}
+.paste-options{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:16px;margin-top:20px;
+}
+.option-group{display:flex;flex-direction:column;gap:6px}
+.option-label{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.option-select,.option-input{
+  background:var(--bg2);border:1px solid var(--border);
+  color:var(--text);border-radius:8px;
+  padding:8px 12px;font-size:13px;
+  font-family:'Space Grotesk',sans-serif;
+  transition:.2s;width:100%;
+}
+.option-select:focus,.option-input:focus{
+  border-color:var(--accent);outline:none;
+  box-shadow:0 0 0 3px rgba(79,142,247,.1);
+}
+.option-input::placeholder{color:var(--text3)}
+.tags-input{
+  display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;padding:6px 10px;
+  cursor:text;transition:.2s;min-height:40px;
+}
+.tags-input:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.1)}
+.tag-chip{
+  background:rgba(79,142,247,.15);color:var(--accent);
+  border-radius:99px;padding:2px 8px 2px 10px;
+  font-size:12px;display:flex;align-items:center;gap:4px;
+}
+.tag-chip button{
+  background:none;border:none;color:var(--accent);
+  cursor:pointer;font-size:14px;line-height:1;padding:0;
+  opacity:.6;transition:.2s;
+}
+.tag-chip button:hover{opacity:1}
+.tags-real-input{
+  background:none;border:none;outline:none;
+  color:var(--text);font-size:13px;
+  font-family:'Space Grotesk',sans-serif;min-width:80px;flex:1;
+}
+.checkbox-row{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 0;
+}
+.toggle{
+  width:40px;height:22px;background:var(--bg3);
+  border:1px solid var(--border);border-radius:99px;
+  cursor:pointer;position:relative;transition:.3s;
+  flex-shrink:0;
+}
+.toggle.on{background:var(--accent);border-color:var(--accent)}
+.toggle::after{
+  content:'';position:absolute;
+  top:2px;left:2px;
+  width:16px;height:16px;border-radius:50%;
+  background:#fff;transition:.3s;
+}
+.toggle.on::after{left:20px}
+.paste-submit-row{
+  display:flex;align-items:center;gap:12px;
+  margin-top:24px;flex-wrap:wrap;
+}
+.btn-submit{
+  padding:12px 32px;border-radius:9px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:15px;font-weight:700;
+  border:none;cursor:pointer;transition:.2s;
+  font-family:'Space Grotesk',sans-serif;
+  box-shadow:0 4px 20px rgba(79,142,247,.3);
+}
+.btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(79,142,247,.4)}
+.btn-submit:active{transform:translateY(0)}
+.btn-outline{
+  padding:12px 24px;border-radius:9px;
+  background:none;border:1px solid var(--border2);
+  color:var(--text2);font-size:14px;font-weight:600;
+  cursor:pointer;transition:.2s;font-family:'Space Grotesk',sans-serif;
+}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── VIEW PASTE ── */
+.view-wrap{max-width:960px;margin:0 auto;padding:32px 24px}
+.paste-meta-bar{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:20px;flex-wrap:wrap;
+}
+.meta-avatar{
+  width:36px;height:36px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:14px;color:#fff;
+  flex-shrink:0;
+}
+.meta-info{flex:1}
+.meta-info h2{font-size:18px;font-weight:700;margin-bottom:2px}
+.meta-info .meta-sub{font-size:12px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap}
+.meta-sub span{display:flex;align-items:center;gap:4px}
+.paste-actions{display:flex;gap:8px;flex-wrap:wrap}
+.action-btn{
+  padding:7px 14px;border-radius:8px;
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--text2);font-size:13px;font-weight:500;
+  cursor:pointer;transition:.2s;
+  font-family:'Space Grotesk',sans-serif;
+  display:flex;align-items:center;gap:6px;
+}
+.action-btn:hover{background:var(--border2);color:var(--text)}
+.action-btn.danger:hover{background:rgba(255,71,87,.1);border-color:var(--red);color:var(--red)}
+.view-editor-wrap{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  box-shadow:var(--glow);
+}
+.view-toolbar{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:var(--bg3);
+  border-bottom:1px solid var(--border);
+}
+.lang-badge{
+  padding:3px 10px;border-radius:99px;
+  background:rgba(79,142,247,.15);color:var(--accent);
+  font-size:11px;font-weight:600;
+}
+.burn-badge{
+  padding:3px 10px;border-radius:99px;
+  background:rgba(255,71,87,.15);color:var(--red);
+  font-size:11px;font-weight:600;
+}
+.private-badge{
+  padding:3px 10px;border-radius:99px;
+  background:rgba(255,211,42,.15);color:var(--yellow);
+  font-size:11px;font-weight:600;
+}
+#view-monaco{height:480px;width:100%}
+#view-plain{
+  white-space:pre-wrap;word-break:break-word;
+  padding:24px;font-family:'JetBrains Mono',monospace;
+  font-size:14px;line-height:1.8;color:var(--text);
+  max-height:600px;overflow:auto;
+}
+.paste-tags-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+/* ── PASSWORD GATE ── */
+.password-gate{
+  max-width:400px;margin:80px auto;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;padding:40px;text-align:center;
+}
+.password-gate .lock-icon{font-size:48px;margin-bottom:16px}
+.password-gate h2{font-size:20px;font-weight:700;margin-bottom:8px}
+.password-gate p{color:var(--text2);font-size:14px;margin-bottom:24px}
+.unlock-input{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);border-radius:9px;padding:12px 16px;
+  font-size:14px;font-family:'Space Grotesk',sans-serif;
+  margin-bottom:12px;transition:.2s;text-align:center;
+}
+.unlock-input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px rgba(79,142,247,.1)}
+.unlock-btn{
+  width:100%;padding:12px;border-radius:9px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;transition:.2s;
+}
+.unlock-btn:hover{opacity:.9}
+
+/* ── PUBLIC LIST ── */
+.list-wrap{max-width:960px;margin:0 auto;padding:32px 24px}
+.list-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:24px;
+}
+.list-header h1{font-size:22px;font-weight:700}
+.paste-list{display:flex;flex-direction:column;gap:12px}
+.paste-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 20px;
+  cursor:pointer;transition:.2s;
+  display:flex;flex-direction:column;gap:8px;
+}
+.paste-card:hover{border-color:var(--border2);background:var(--bg3);transform:translateX(3px)}
+.paste-card-top{display:flex;align-items:center;gap:10px}
+.paste-card-icon{
+  width:36px;height:36px;border-radius:8px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;
+}
+.paste-card-info{flex:1;min-width:0}
+.paste-card-title{font-weight:600;font-size:15px;truncate overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.paste-card-sub{font-size:12px;color:var(--text3);display:flex;gap:10px;margin-top:2px;flex-wrap:wrap}
+.paste-card-preview{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;color:var(--text3);
+  white-space:pre;overflow:hidden;text-overflow:ellipsis;
+  max-height:40px;border-left:3px solid var(--border);
+  padding-left:10px;line-height:1.6;
+}
+.pagination{
+  display:flex;align-items:center;gap:8px;
+  justify-content:center;margin-top:32px;
+}
+.page-btn{
+  width:36px;height:36px;border-radius:8px;
+  background:var(--bg2);border:1px solid var(--border);
+  color:var(--text2);cursor:pointer;transition:.2s;
+  font-family:'Space Grotesk',sans-serif;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+}
+.page-btn:hover,.page-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ── AUTH MODAL ── */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(8px);
+  z-index:500;display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:.3s;
+}
+.modal-overlay.show{opacity:1;pointer-events:all}
+.modal{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;padding:40px;
+  width:100%;max-width:420px;
+  transform:scale(.95) translateY(10px);transition:.3s;
+  box-shadow:0 40px 100px rgba(0,0,0,.6);
+}
+.modal-overlay.show .modal{transform:scale(1) translateY(0)}
+.modal-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.modal-sub{color:var(--text2);font-size:14px;margin-bottom:28px}
+.modal-tabs{
+  display:flex;margin-bottom:28px;
+  background:var(--bg3);border-radius:9px;padding:3px;
+}
+.modal-tab{
+  flex:1;padding:8px;border-radius:7px;text-align:center;
+  font-size:14px;font-weight:600;cursor:pointer;
+  color:var(--text3);transition:.2s;border:none;background:none;
+  font-family:'Space Grotesk',sans-serif;
+}
+.modal-tab.active{background:var(--accent);color:#fff}
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.form-label{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.form-input{
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);border-radius:9px;padding:12px 14px;
+  font-size:14px;font-family:'Space Grotesk',sans-serif;
+  transition:.2s;
+}
+.form-input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px rgba(79,142,247,.1)}
+.form-submit{
+  width:100%;padding:13px;border-radius:9px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;margin-top:8px;transition:.2s;
+}
+.form-submit:hover{opacity:.9;transform:translateY(-1px)}
+.modal-close{
+  position:absolute;top:16px;right:16px;
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--text2);width:32px;height:32px;border-radius:50%;
+  cursor:pointer;font-size:16px;transition:.2s;
+  display:flex;align-items:center;justify-content:center;
+}
+.modal-close:hover{background:var(--border2);color:var(--text)}
+.modal{position:relative}
+
+/* ── USER PROFILE ── */
+.profile-wrap{max-width:960px;margin:0 auto;padding:32px 24px}
+.profile-header{
+  display:flex;align-items:center;gap:20px;
+  padding:28px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;margin-bottom:24px;
+}
+.profile-avatar{
+  width:72px;height:72px;border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:700;color:#fff;flex-shrink:0;
+}
+.profile-info h2{font-size:22px;font-weight:700}
+.profile-info p{color:var(--text2);font-size:14px;margin-top:4px}
+
+/* ── SEARCH ── */
+.search-wrap{max-width:960px;margin:0 auto;padding:32px 24px}
+
+/* ── TOAST ── */
+.toast-container{
+  position:fixed;bottom:24px;right:24px;
+  z-index:9998;display:flex;flex-direction:column;gap:8px;
+}
+.toast{
+  padding:12px 20px;border-radius:10px;
+  font-size:14px;font-weight:500;
+  display:flex;align-items:center;gap:10px;
+  animation:toastIn .3s ease;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);
+  max-width:300px;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(30px) scale(.9)}to{opacity:1;transform:none}}
+.toast.success{background:#1a2e1f;border:1px solid #2ed573;color:#2ed573}
+.toast.error{background:#2e1a1a;border:1px solid #ff4757;color:#ff4757}
+.toast.info{background:#1a2237;border:1px solid #4f8ef7;color:#4f8ef7}
+
+/* ── COPY CONFIRM ── */
+.copy-overlay{
+  position:fixed;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;z-index:9000;
+  opacity:0;transition:.3s;
+}
+.copy-overlay.show{opacity:1}
+.copy-pill{
+  background:rgba(79,142,247,.9);color:#fff;
+  padding:12px 28px;border-radius:99px;
+  font-size:16px;font-weight:700;
+  backdrop-filter:blur(10px);
+}
+
+/* ── MISC ── */
+.empty-state{
+  text-align:center;padding:80px 24px;
+  color:var(--text3);
+}
+.empty-state .empty-icon{font-size:48px;margin-bottom:16px}
+.empty-state h3{font-size:18px;font-weight:600;color:var(--text2);margin-bottom:8px}
+.section-title{font-size:18px;font-weight:700;margin-bottom:16px}
+.error-msg{
+  color:var(--red);font-size:13px;
+  padding:10px 14px;background:rgba(255,71,87,.1);
+  border:1px solid rgba(255,71,87,.3);border-radius:8px;
+  margin-top:8px;
+}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.grid-2{grid-template-columns:1fr}.nav-search{display:none}}
+.expiry-indicator{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;padding:4px 10px;border-radius:99px;
+  background:rgba(255,189,46,.1);color:var(--yellow);border:1px solid rgba(255,189,46,.2);
+}
+.char-count{
+  font-size:11px;color:var(--text3);
+  font-family:'JetBrains Mono',monospace;
+}
+.line-count{font-size:11px;color:var(--text3);margin-left:auto}
+</style>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+  <div class="splash-logo">
+    <div class="splash-icon">📋</div>
+    <div class="splash-brand">PasteBin</div>
+  </div>
+  <div class="splash-tagline">Your code. Shared. Instantly.</div>
+  <div class="splash-enter-text" id="splash-typing"></div>
+  <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+<div class="copy-overlay" id="copyOverlay"><div class="copy-pill">✓ Copied!</div></div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div class="modal-title">Welcome back</div>
+    <div class="modal-sub">Sign in or create your account</div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+      <button class="modal-tab" id="tabRegister" onclick="switchTab('register')">Register</button>
+    </div>
+    <!-- Login -->
+    <div id="loginForm">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" id="loginUsername" placeholder="your_username" autocomplete="username"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"/>
+      </div>
+      <div id="loginError"></div>
+      <button class="form-submit" onclick="doLogin()">Sign In →</button>
+    </div>
+    <!-- Register -->
+    <div id="registerForm" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" id="regUsername" placeholder="cool_username"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="regEmail" placeholder="you@example.com"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="regPassword" placeholder="min 6 characters"/>
+      </div>
+      <div id="registerError"></div>
+      <button class="form-submit" onclick="doRegister()">Create Account →</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-brand" onclick="showPage('home')">
+    <div class="nav-icon">📋</div>
+    <div class="nav-brand-text">PasteBin</div>
+  </a>
+  <div class="nav-links">
+    <a class="nav-link" onclick="showPage('home')">+ New Paste</a>
+    <a class="nav-link" onclick="showPage('public')">Public</a>
+    <a class="nav-link" id="navMyPastes" style="display:none" onclick="showMyPastes()">My Pastes</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <div class="nav-search">
+    <span style="color:var(--text3)">🔍</span>
+    <input id="navSearchInput" placeholder="Search pastes..." onkeydown="if(event.key==='Enter')doSearch()"/>
+  </div>
+  <div id="navGuest" style="display:flex;gap:8px;align-items:center">
+    <button class="nav-btn btn-ghost" onclick="openAuthModal('login')">Sign In</button>
+    <button class="nav-btn btn-primary" onclick="openAuthModal('register')">Register</button>
+  </div>
+  <div id="navUser" style="display:none">
+    <div class="user-menu">
+      <div class="user-avatar" id="navAvatar" onclick="toggleDropdown()"></div>
+      <div class="dropdown" id="userDropdown">
+        <div class="dropdown-item" onclick="showMyPastes()">📄 My Pastes</div>
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-item" onclick="doLogout()" style="color:var(--red)">🚪 Logout</div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ══ PAGE: HOME (NEW PASTE) ══ -->
+<div class="page active" id="page-home">
+  <div class="home-wrap">
+    <div class="paste-header">
+      <h1>New Paste</h1>
+      <span class="badge">Editor</span>
+    </div>
+    <div class="editor-wrap">
+      <div class="editor-toolbar">
+        <div class="toolbar-dots">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+        </div>
+        <div class="toolbar-sep"></div>
+        <input class="editor-title-input" id="pasteTitle" placeholder="Untitled paste…" maxlength="100"/>
+        <div class="toolbar-sep"></div>
+        <div class="format-toggle">
+          <button class="format-btn active" id="fmtCode" onclick="setFormat('code')">⌨ Code</button>
+          <button class="format-btn" id="fmtPlain" onclick="setFormat('plain')">📝 Plain</button>
+        </div>
+        <select class="toolbar-select" id="langSelect" onchange="changeLang()">
+          <option value="plaintext">Plain Text</option>
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="java">Java</option>
+          <option value="c">C</option>
+          <option value="cpp">C++</option>
+          <option value="csharp">C#</option>
+          <option value="go">Go</option>
+          <option value="rust">Rust</option>
+          <option value="ruby">Ruby</option>
+          <option value="php">PHP</option>
+          <option value="swift">Swift</option>
+          <option value="kotlin">Kotlin</option>
+          <option value="sql">SQL</option>
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="json">JSON</option>
+          <option value="xml">XML</option>
+          <option value="yaml">YAML</option>
+          <option value="markdown">Markdown</option>
+          <option value="bash">Bash</option>
+          <option value="dockerfile">Dockerfile</option>
+          <option value="lua">Lua</option>
+          <option value="perl">Perl</option>
+          <option value="r">R</option>
+        </select>
+        <span class="char-count" id="charCount">0 chars</span>
+        <span class="line-count" id="lineCount">0 lines</span>
+      </div>
+      <div id="monaco-container"></div>
+      <textarea id="plain-textarea" style="display:none" placeholder="Type your text here…" oninput="updateCounts()"></textarea>
+    </div>
+
+    <div class="paste-options">
+      <div class="option-group">
+        <label class="option-label">Expiration</label>
+        <select class="option-select" id="optExpiry">
+          <option value="never">Never</option>
+          <option value="10m">10 Minutes</option>
+          <option value="1h">1 Hour</option>
+          <option value="1d">1 Day</option>
+          <option value="1w">1 Week</option>
+          <option value="1month">1 Month</option>
+          <option value="6months">6 Months</option>
+          <option value="1y">1 Year</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label class="option-label">Visibility</label>
+        <select class="option-select" id="optVisibility">
+          <option value="public">🌍 Public</option>
+          <option value="unlisted">🔗 Unlisted</option>
+          <option value="private">🔒 Private (login required)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label class="option-label">Password (optional)</label>
+        <input class="option-input" type="password" id="optPassword" placeholder="Leave blank for none"/>
+      </div>
+      <div class="option-group">
+        <label class="option-label">Tags</label>
+        <div class="tags-input" id="tagsWrap" onclick="document.getElementById('tagInput').focus()">
+          <input class="tags-real-input" id="tagInput" placeholder="Add tag…" onkeydown="handleTagInput(event)" maxlength="30"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <div class="toggle" id="burnToggle" onclick="this.classList.toggle('on')"></div>
+      <span style="font-size:14px;color:var(--text2)">🔥 Burn after read — Delete after first view</span>
+    </div>
+
+    <div class="paste-submit-row">
+      <button class="btn-submit" onclick="createPaste()">📋 Create Paste</button>
+      <button class="btn-outline" onclick="clearEditor()">🗑 Clear</button>
+      <div id="submitError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: VIEW ══ -->
+<div class="page" id="page-view">
+  <div class="view-wrap">
+    <div id="pasteViewContent"></div>
+  </div>
+</div>
+
+<!-- ══ PAGE: PUBLIC ══ -->
+<div class="page" id="page-public">
+  <div class="list-wrap">
+    <div class="list-header">
+      <h1>🌍 Public Pastes</h1>
+      <span id="publicTotal" style="color:var(--text3);font-size:14px"></span>
+    </div>
+    <div id="publicList"></div>
+    <div class="pagination" id="publicPagination"></div>
+  </div>
+</div>
+
+<!-- ══ PAGE: PROFILE ══ -->
+<div class="page" id="page-profile">
+  <div class="profile-wrap">
+    <div id="profileContent"></div>
+  </div>
+</div>
+
+<!-- ══ PAGE: SEARCH ══ -->
+<div class="page" id="page-search">
+  <div class="search-wrap">
+    <div class="list-header" style="flex-direction:column;align-items:flex-start;gap:8px">
+      <h1>🔍 Search Results</h1>
+      <span id="searchQueryLabel" style="color:var(--text3);font-size:14px"></span>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let monacoEditor = null;
+let currentUser = null;
+let currentFormat = 'code';
+let tags = [];
+let monacoReady = false;
+let currentPastePage = 1;
+const LANG_MAP = {
+  'plaintext':'plaintext','python':'python','javascript':'javascript','typescript':'typescript',
+  'java':'java','c':'c','cpp':'cpp','csharp':'csharp','go':'go','rust':'rust',
+  'ruby':'ruby','php':'php','swift':'swift','kotlin':'kotlin','sql':'sql',
+  'html':'html','css':'css','json':'json','xml':'xml','yaml':'yaml',
+  'markdown':'markdown','bash':'shell','dockerfile':'dockerfile','lua':'lua',
+  'perl':'perl','r':'r'
+};
+
+// ════════════════════════════════════════════════
+// SPLASH
+// ════════════════════════════════════════════════
+const splashText = "▸ Entering the system…";
+const typingEl = document.getElementById('splash-typing');
+let ti = 0;
+function typeChar(){
+  if(ti < splashText.length){
+    typingEl.textContent += splashText[ti++];
+    setTimeout(typeChar, 55);
+  }
+}
+setTimeout(typeChar, 900);
+setTimeout(()=>{
+  document.getElementById('splash').classList.add('hide');
+  setTimeout(()=>document.getElementById('splash').remove(), 700);
+}, 3400);
+
+// ════════════════════════════════════════════════
+// MONACO INIT
+// ════════════════════════════════════════════════
+require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+require(['vs/editor/editor.main'], function(){
+  monacoEditor = monaco.editor.create(document.getElementById('monaco-container'), {
+    value: '',
+    language: 'plaintext',
+    theme: 'vs-dark',
+    fontSize: 14,
+    fontFamily: "'JetBrains Mono', monospace",
+    lineNumbers: 'on',
+    minimap: { enabled: true },
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    wordWrap: 'on',
+    padding: { top: 16, bottom: 16 },
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    renderWhitespace: 'selection',
+    bracketPairColorization: { enabled: true },
+    suggest: { showKeywords: true },
+  });
+  monaco.editor.setTheme('vs-dark');
+  monacoReady = true;
+  monacoEditor.onDidChangeModelContent(updateCounts);
+  updateCounts();
+});
+
+function updateCounts(){
+  let content = getEditorContent();
+  document.getElementById('charCount').textContent = content.length.toLocaleString() + ' chars';
+  document.getElementById('lineCount').textContent = content.split('\n').length.toLocaleString() + ' lines';
+}
+
+function getEditorContent(){
+  if(currentFormat === 'code' && monacoReady) return monacoEditor.getValue();
+  return document.getElementById('plain-textarea').value;
+}
+
+function setEditorContent(val){
+  if(monacoReady) monacoEditor.setValue(val || '');
+  document.getElementById('plain-textarea').value = val || '';
+}
+
+function changeLang(){
+  if(!monacoReady) return;
+  const lang = document.getElementById('langSelect').value;
+  monaco.editor.setModelLanguage(monacoEditor.getModel(), LANG_MAP[lang] || 'plaintext');
+}
+
+function setFormat(fmt){
+  currentFormat = fmt;
+  document.getElementById('fmtCode').classList.toggle('active', fmt==='code');
+  document.getElementById('fmtPlain').classList.toggle('active', fmt==='plain');
+  document.getElementById('monaco-container').style.display = fmt==='code'?'block':'none';
+  document.getElementById('plain-textarea').style.display = fmt==='plain'?'block':'none';
+  document.getElementById('langSelect').style.display = fmt==='code'?'':'none';
+  if(fmt==='code' && monacoReady) monacoEditor.layout();
+}
+
+function clearEditor(){
+  setEditorContent('');
+  document.getElementById('pasteTitle').value='';
+  document.getElementById('optExpiry').value='never';
+  document.getElementById('optVisibility').value='public';
+  document.getElementById('optPassword').value='';
+  tags=[];renderTags();
+  document.getElementById('burnToggle').classList.remove('on');
+  updateCounts();
+}
+
+// ════════════════════════════════════════════════
+// TAGS
+// ════════════════════════════════════════════════
+function handleTagInput(e){
+  if(['Enter','Tab',','].includes(e.key)){
+    e.preventDefault();
+    const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9\-]/g,'');
+    if(val && !tags.includes(val) && tags.length < 10){
+      tags.push(val);
+      renderTags();
+    }
+    e.target.value='';
+  }
+  if(e.key==='Backspace' && !e.target.value && tags.length){
+    tags.pop();renderTags();
+  }
+}
+function renderTags(){
+  const wrap = document.getElementById('tagsWrap');
+  const input = document.getElementById('tagInput');
+  wrap.innerHTML='';
+  tags.forEach((t,i)=>{
+    const chip = document.createElement('div');
+    chip.className='tag-chip';
+    chip.innerHTML=`${t}<button onclick="removeTag(${i})">×</button>`;
+    wrap.appendChild(chip);
+  });
+  wrap.appendChild(input);
+}
+function removeTag(i){ tags.splice(i,1); renderTags(); }
+
+// ════════════════════════════════════════════════
+// PAGE ROUTING
+// ════════════════════════════════════════════════
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const el = document.getElementById('page-'+name);
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(l=>{
+    l.classList.toggle('active', l.getAttribute('onclick')?.includes(name));
+  });
+  window.scrollTo(0,0);
+  if(name==='public') loadPublicPastes(1);
+}
+
+// ════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════
+async function checkAuth(){
+  try{
+    const r = await fetch('/api/auth/me');
+    const d = await r.json();
+    currentUser = d.user;
+    updateNavAuth();
+  }catch(e){currentUser=null;updateNavAuth();}
+}
+
+function updateNavAuth(){
+  const guestEl = document.getElementById('navGuest');
+  const userEl = document.getElementById('navUser');
+  const myPastesLink = document.getElementById('navMyPastes');
+  if(currentUser){
+    guestEl.style.display='none';
+    userEl.style.display='block';
+    myPastesLink.style.display='block';
+    const av = document.getElementById('navAvatar');
+    av.textContent = currentUser.username[0].toUpperCase();
+    av.style.background = currentUser.avatar_color;
+  } else {
+    guestEl.style.display='flex';
+    userEl.style.display='none';
+    myPastesLink.style.display='none';
+  }
+}
+
+function openAuthModal(tab='login'){
+  switchTab(tab);
+  document.getElementById('authModal').classList.add('show');
+}
+function closeAuthModal(){ document.getElementById('authModal').classList.remove('show'); }
+function switchTab(tab){
+  document.getElementById('loginForm').style.display = tab==='login'?'block':'none';
+  document.getElementById('registerForm').style.display = tab==='register'?'block':'none';
+  document.getElementById('tabLogin').classList.toggle('active',tab==='login');
+  document.getElementById('tabRegister').classList.toggle('active',tab==='register');
+}
+
+async function doLogin(){
+  const u = document.getElementById('loginUsername').value.trim();
+  const p = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.innerHTML='';
+  if(!u||!p){ errEl.innerHTML='<div class="error-msg">Fill in all fields</div>'; return; }
+  try{
+    const r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d = await r.json();
+    if(!r.ok){ errEl.innerHTML=`<div class="error-msg">${d.detail}</div>`; return; }
+    closeAuthModal();
+    await checkAuth();
+    showToast('Welcome back, '+u+'!','success');
+  }catch(e){ errEl.innerHTML='<div class="error-msg">Connection error</div>'; }
+}
+
+async function doRegister(){
+  const u = document.getElementById('regUsername').value.trim();
+  const e2 = document.getElementById('regEmail').value.trim();
+  const p = document.getElementById('regPassword').value;
+  const errEl = document.getElementById('registerError');
+  errEl.innerHTML='';
+  if(!u||!e2||!p){ errEl.innerHTML='<div class="error-msg">Fill in all fields</div>'; return; }
+  try{
+    const r = await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,email:e2,password:p})});
+    const d = await r.json();
+    if(!r.ok){ errEl.innerHTML=`<div class="error-msg">${d.detail}</div>`; return; }
+    closeAuthModal();
+    await checkAuth();
+    showToast('Account created! Welcome, '+u,'success');
+  }catch(e){ errEl.innerHTML='<div class="error-msg">Connection error</div>'; }
+}
+
+async function doLogout(){
+  await fetch('/api/auth/logout',{method:'POST'});
+  currentUser=null;updateNavAuth();
+  showToast('Logged out','info');
+  showPage('home');
+}
+
+function toggleDropdown(){
+  document.getElementById('userDropdown').classList.toggle('show');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.user-menu')) document.getElementById('userDropdown').classList.remove('show');
+});
+
+// ════════════════════════════════════════════════
+// CREATE PASTE
+// ════════════════════════════════════════════════
+async function createPaste(){
+  const content = getEditorContent();
+  if(!content.trim()){ showToast('Content cannot be empty','error'); return; }
+  const body = {
+    title: document.getElementById('pasteTitle').value.trim() || 'Untitled',
+    content,
+    language: document.getElementById('langSelect').value,
+    format: currentFormat,
+    visibility: document.getElementById('optVisibility').value,
+    password: document.getElementById('optPassword').value || null,
+    expiration: document.getElementById('optExpiry').value,
+    burn_after_read: document.getElementById('burnToggle').classList.contains('on'),
+    tags: [...tags]
+  };
+  document.getElementById('submitError').innerHTML='';
+  try{
+    const r = await fetch('/api/paste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json();
+    if(!r.ok){ document.getElementById('submitError').innerHTML=`<div class="error-msg">${d.detail}</div>`; return; }
+    showToast('Paste created!','success');
+    viewPaste(d.short_code);
+  }catch(e){ document.getElementById('submitError').innerHTML='<div class="error-msg">Server error</div>'; }
+}
+
+// ════════════════════════════════════════════════
+// VIEW PASTE
+// ════════════════════════════════════════════════
+async function viewPaste(code){
+  showPage('view');
+  const wrap = document.getElementById('pasteViewContent');
+  wrap.innerHTML='<div style="text-align:center;padding:80px;color:var(--text3)">Loading…</div>';
+  try{
+    const r = await fetch('/api/paste/'+code);
+    if(r.status===404){ wrap.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><h3>Paste Not Found</h3><p>It may have expired or been deleted.</p></div>'; return; }
+    if(r.status===403){ wrap.innerHTML='<div class="empty-state"><div class="empty-icon">🔒</div><h3>Private Paste</h3><p>This paste is private.</p></div>'; return; }
+    const d = await r.json();
+    if(d.locked){ renderPasswordGate(d,code); }
+    else { renderPasteView(d,code); }
+  }catch(e){ wrap.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Error loading paste</h3></div>'; }
+}
+
+function renderPasswordGate(meta, code){
+  const wrap = document.getElementById('pasteViewContent');
+  wrap.innerHTML=`
+    <div class="password-gate">
+      <div class="lock-icon">🔒</div>
+      <h2>${escHtml(meta.title||'Protected Paste')}</h2>
+      <p>This paste is password protected. Enter the password to view it.</p>
+      <input class="unlock-input" type="password" id="unlockPass" placeholder="Enter password…" onkeydown="if(event.key==='Enter')unlockPaste('${code}')"/>
+      <div id="unlockError" style="margin-bottom:10px"></div>
+      <button class="unlock-btn" onclick="unlockPaste('${code}')">🔓 Unlock Paste</button>
+    </div>`;
+}
+
+async function unlockPaste(code){
+  const pw = document.getElementById('unlockPass').value;
+  if(!pw){ showToast('Enter a password','error'); return; }
+  const r = await fetch('/api/paste/'+code+'/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  if(r.status===401){ document.getElementById('unlockError').innerHTML='<div class="error-msg">Wrong password</div>'; return; }
+  const d = await r.json();
+  renderPasteView(d,code);
+}
+
+function renderPasteView(d, code){
+  const wrap = document.getElementById('pasteViewContent');
+  const timeAgo = formatTimeAgo(d.created_at);
+  const expText = d.expiration ? formatTimeAgo(d.expiration, true) : 'Never';
+  const ownerHtml = d.owner
+    ? `<span style="cursor:pointer;text-decoration:underline" onclick="showProfile('${escHtml(d.owner.username)}')">${escHtml(d.owner.username)}</span>`
+    : 'Guest';
+  const isOwner = currentUser && d.user_id && currentUser.id === d.user_id;
+
+  const tagsHtml = (d.tags||[]).map(t=>`<span class="tag-chip">${escHtml(t)}</span>`).join('');
+
+  wrap.innerHTML = `
+    <div class="paste-meta-bar">
+      ${d.owner ? `<div class="meta-avatar" style="background:${d.owner.owner_color||'#4f8ef7'}">${d.owner.username[0].toUpperCase()}</div>` : '<div class="meta-avatar" style="background:#333">?</div>'}
+      <div class="meta-info">
+        <h2>${escHtml(d.title||'Untitled')}</h2>
+        <div class="meta-sub">
+          <span>👤 ${ownerHtml}</span>
+          <span>🕐 ${timeAgo}</span>
+          <span>👁 ${(d.views||0).toLocaleString()} views</span>
+          <span>⏱ Expires: ${expText}</span>
+          ${d.burn_after_read ? '<span style="color:var(--red)">🔥 Burn after read</span>' : ''}
+          ${d.visibility==='unlisted'?'<span style="color:var(--yellow)">🔗 Unlisted</span>':''}
+          ${d.visibility==='private'?'<span style="color:var(--yellow)">🔒 Private</span>':''}
+        </div>
+      </div>
+    </div>
+    <div class="paste-actions" style="margin-bottom:16px">
+      <button class="action-btn" onclick="copyPasteContent('${code}')">📋 Copy</button>
+      <button class="action-btn" onclick="window.open('/api/paste/${code}/raw','_blank')">📄 Raw</button>
+      <button class="action-btn" onclick="downloadPaste('${code}','${escHtml(d.title||'paste')}','${d.language||'txt'}')">⬇ Download</button>
+      <button class="action-btn" onclick="forkPaste('${code}')">🍴 Fork</button>
+      <button class="action-btn" onclick="copyShareLink('${code}')">🔗 Share</button>
+      ${isOwner ? `<button class="action-btn danger" onclick="deletePaste('${code}')">🗑 Delete</button>` : ''}
+    </div>
+    <div class="view-editor-wrap">
+      <div class="view-toolbar">
+        <span class="lang-badge">${escHtml(d.language||'plaintext')}</span>
+        ${d.burn_after_read?'<span class="burn-badge">🔥 Burn</span>':''}
+        ${d.visibility==='private'?'<span class="private-badge">🔒 Private</span>':''}
+        <span style="flex:1"></span>
+        <span class="char-count">${(d.content||'').length.toLocaleString()} chars · ${(d.content||'').split('\n').length} lines</span>
+      </div>
+      ${d.format==='plain'
+        ? `<div id="view-plain">${escHtml(d.content||'')}</div>`
+        : `<div id="view-monaco"></div>`
+      }
+    </div>
+    ${tagsHtml ? `<div class="paste-tags-row">${tagsHtml}</div>` : ''}
+  `;
+
+  if(d.format !== 'plain'){
+    require(['vs/editor/editor.main'], function(){
+      const viewEd = monaco.editor.create(document.getElementById('view-monaco'), {
+        value: d.content || '',
+        language: LANG_MAP[d.language] || 'plaintext',
+        theme: 'vs-dark',
+        readOnly: true,
+        fontSize: 14,
+        fontFamily: "'JetBrains Mono', monospace",
+        lineNumbers: 'on',
+        minimap: { enabled: true },
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        wordWrap: 'on',
+        padding: { top: 16, bottom: 16 },
+      });
+      viewEd.layout({width: document.getElementById('view-monaco').offsetWidth, height: Math.min(Math.max(d.content.split('\n').length * 21 + 60, 300), 700)});
+    });
+  }
+
+  window._currentPasteContent = d.content;
+  window._currentPasteCode = code;
+}
+
+async function copyPasteContent(code){
+  try{
+    await navigator.clipboard.writeText(window._currentPasteContent||'');
+    showCopyOverlay();
+  }catch(e){ showToast('Copy failed','error'); }
+}
+
+async function forkPaste(code){
+  const content = window._currentPasteContent;
+  if(!content) return;
+  setEditorContent(content);
+  showPage('home');
+  showToast('Content forked into editor!','info');
+}
+
+async function deletePaste(code){
+  if(!confirm('Delete this paste? This cannot be undone.')) return;
+  const r = await fetch('/api/paste/'+code,{method:'DELETE'});
+  if(r.ok){ showToast('Paste deleted','info'); showPage('home'); }
+  else showToast('Delete failed','error');
+}
+
+function downloadPaste(code, title, lang){
+  const content = window._currentPasteContent||'';
+  const ext = {'python':'py','javascript':'js','typescript':'ts','html':'html','css':'css','json':'json','java':'java','cpp':'cpp','c':'c','go':'go','rust':'rs','ruby':'rb','php':'php','sql':'sql','bash':'sh','yaml':'yml','markdown':'md'}[lang]||'txt';
+  const blob = new Blob([content],{type:'text/plain'});
+  const a = document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(title||'paste')+'.'+ext;
+  a.click();
+}
+
+function copyShareLink(code){
+  const url = window.location.origin+'/view/'+code;
+  navigator.clipboard.writeText(url).then(()=>showCopyOverlay()).catch(()=>showToast('Copy failed','error'));
+}
+
+// ════════════════════════════════════════════════
+// PUBLIC LIST
+// ════════════════════════════════════════════════
+async function loadPublicPastes(page=1){
+  currentPastePage=page;
+  const r = await fetch('/api/public?page='+page);
+  const d = await r.json();
+  document.getElementById('publicTotal').textContent = d.total.toLocaleString()+' pastes';
+  const list = document.getElementById('publicList');
+  if(!d.pastes.length){
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><h3>No public pastes yet</h3></div>';
+    return;
+  }
+  list.innerHTML = d.pastes.map(p=>`
+    <div class="paste-card" onclick="viewPaste('${p.short_code}')">
+      <div class="paste-card-top">
+        <div class="paste-card-icon">${langIcon(p.language)}</div>
+        <div class="paste-card-info">
+          <div class="paste-card-title">${escHtml(p.title||'Untitled')}</div>
+          <div class="paste-card-sub">
+            <span>👤 ${escHtml(p.owner_username||'Guest')}</span>
+            <span>⌨ ${escHtml(p.language||'text')}</span>
+            <span>🕐 ${formatTimeAgo(p.created_at)}</span>
+            <span>👁 ${(p.views||0).toLocaleString()}</span>
+          </div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);">${p.short_code}</span>
+      </div>
+      ${p.preview?`<div class="paste-card-preview">${escHtml(p.preview.slice(0,200))}</div>`:''}
+    </div>`).join('');
+
+  // Pagination
+  const pg = document.getElementById('publicPagination');
+  pg.innerHTML='';
+  for(let i=1;i<=d.pages;i++){
+    const btn = document.createElement('button');
+    btn.className='page-btn'+(i===page?' active':'');
+    btn.textContent=i;
+    btn.onclick=()=>loadPublicPastes(i);
+    pg.appendChild(btn);
+  }
+}
+
+// ════════════════════════════════════════════════
+// PROFILE
+// ════════════════════════════════════════════════
+async function showProfile(username){
+  showPage('profile');
+  const wrap = document.getElementById('profileContent');
+  wrap.innerHTML='<div style="text-align:center;padding:60px;color:var(--text3)">Loading…</div>';
+  const r = await fetch('/api/user/'+encodeURIComponent(username)+'/pastes');
+  if(!r.ok){ wrap.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><h3>User not found</h3></div>'; return; }
+  const d = await r.json();
+  wrap.innerHTML = `
+    <div class="profile-header">
+      <div class="profile-avatar" style="background:${d.avatar_color||'#4f8ef7'}">${d.username[0].toUpperCase()}</div>
+      <div class="profile-info">
+        <h2>${escHtml(d.username)}</h2>
+        <p>${d.pastes.length} paste${d.pastes.length!==1?'s':''}</p>
+      </div>
+    </div>
+    <div class="section-title">Pastes</div>
+    <div class="paste-list">${d.pastes.map(p=>`
+      <div class="paste-card" onclick="viewPaste('${p.short_code}')">
+        <div class="paste-card-top">
+          <div class="paste-card-icon">${langIcon(p.language)}</div>
+          <div class="paste-card-info">
+            <div class="paste-card-title">${escHtml(p.title||'Untitled')}</div>
+            <div class="paste-card-sub">
+              <span>⌨ ${escHtml(p.language||'text')}</span>
+              <span>🕐 ${formatTimeAgo(p.created_at)}</span>
+              <span>👁 ${(p.views||0).toLocaleString()}</span>
+              ${p.visibility==='private'?'<span style="color:var(--yellow)">🔒</span>':p.visibility==='unlisted'?'<span style="color:var(--yellow)">🔗</span>':''}
+            </div>
+          </div>
+        </div>
+        ${p.preview?`<div class="paste-card-preview">${escHtml(p.preview.slice(0,150))}</div>`:''}
+      </div>`).join('')}
+    </div>`;
+}
+
+function showMyPastes(){
+  if(currentUser) showProfile(currentUser.username);
+  else openAuthModal('login');
+}
+
+// ════════════════════════════════════════════════
+// SEARCH
+// ════════════════════════════════════════════════
+async function doSearch(){
+  const q = document.getElementById('navSearchInput').value.trim();
+  if(!q) return;
+  showPage('search');
+  document.getElementById('searchQueryLabel').textContent = 'Results for "'+q+'"';
+  const r = await fetch('/api/search?q='+encodeURIComponent(q));
+  const d = await r.json();
+  const el = document.getElementById('searchResults');
+  if(!d.results.length){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><h3>No results found</h3></div>';
+    return;
+  }
+  el.innerHTML = '<div class="paste-list">'+d.results.map(p=>`
+    <div class="paste-card" onclick="viewPaste('${p.short_code}')">
+      <div class="paste-card-top">
+        <div class="paste-card-icon">${langIcon(p.language)}</div>
+        <div class="paste-card-info">
+          <div class="paste-card-title">${escHtml(p.title||'Untitled')}</div>
+          <div class="paste-card-sub">
+            <span>⌨ ${escHtml(p.language||'text')}</span>
+            <span>🕐 ${formatTimeAgo(p.created_at)}</span>
+            <span>👁 ${(p.views||0).toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+      ${p.preview?`<div class="paste-card-preview">${escHtml(p.preview.slice(0,200))}</div>`:''}
+    </div>`).join('')
+  +'</div>';
+}
+
+// ════════════════════════════════════════════════
+// URL ROUTING
+// ════════════════════════════════════════════════
+function handleRoute(){
+  const path = window.location.pathname;
+  if(path === '/' || path === '/new' || path === '') { showPage('home'); return; }
+  if(path === '/public') { showPage('public'); loadPublicPastes(1); return; }
+  const viewMatch = path.match(/^\/(?:view\/)?([A-Za-z0-9]{4,12})$/);
+  if(viewMatch){ viewPaste(viewMatch[1]); return; }
+  const profileMatch = path.match(/^\/u\/(.+)$/);
+  if(profileMatch){ showProfile(decodeURIComponent(profileMatch[1])); return; }
+}
+
+window.addEventListener('popstate', handleRoute);
+
+// Override nav clicks to use history
+document.querySelectorAll('[onclick*="showPage"]').forEach(el=>{
+  const orig = el.getAttribute('onclick');
+  el.addEventListener('click', ()=>{
+    const m = orig.match(/showPage\('(\w+)'\)/);
+    if(m && m[1]==='home') history.pushState({},'','/');
+    else if(m && m[1]==='public') history.pushState({},'','/public');
+  });
+});
+
+// ════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════
+function escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatTimeAgo(ts, future=false){
+  if(!ts) return 'Never';
+  const now = Math.floor(Date.now()/1000);
+  const diff = future ? ts-now : now-ts;
+  if(diff < 0 && !future) return 'just now';
+  if(diff < 60) return diff+'s '+(future?'left':'ago');
+  if(diff < 3600) return Math.floor(diff/60)+'m '+(future?'left':'ago');
+  if(diff < 86400) return Math.floor(diff/3600)+'h '+(future?'left':'ago');
+  if(diff < 2592000) return Math.floor(diff/86400)+'d '+(future?'left':'ago');
+  if(diff < 31536000) return Math.floor(diff/2592000)+'mo '+(future?'left':'ago');
+  return Math.floor(diff/31536000)+'y '+(future?'left':'ago');
+}
+function langIcon(lang){
+  const m={'python':'🐍','javascript':'⚡','typescript':'📘','html':'🌐','css':'🎨','java':'☕','go':'🐹','rust':'🦀','sql':'🗄','json':'📦','bash':'🖥','ruby':'💎','php':'🐘','cpp':'⚙️','c':'⚙️','markdown':'📝'};
+  return m[lang]||'📄';
+}
+function showToast(msg, type='info'){
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className='toast '+type;
+  t.innerHTML = (type==='success'?'✓ ':type==='error'?'✕ ':'ℹ ') + msg;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+function showCopyOverlay(){
+  const o = document.getElementById('copyOverlay');
+  o.classList.add('show');
+  setTimeout(()=>o.classList.remove('show'),1200);
+}
+
+// Close modal on overlay click
+document.getElementById('authModal').addEventListener('click', function(e){
+  if(e.target === this) closeAuthModal();
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==='Enter') createPaste();
+  if((e.ctrlKey||e.metaKey) && e.key==='k'){ e.preventDefault(); document.getElementById('navSearchInput').focus(); }
+  if(e.key==='Escape') closeAuthModal();
+});
+
+// ════════════════════════════════════════════════
+// INITx══════════════════════════
+checkAuth().then(()=>{ handleRoute(); });
+</script>
+</body>
+</html>

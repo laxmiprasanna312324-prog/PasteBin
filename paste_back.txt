@@ -1,0 +1,350 @@
+from fastapi import FastAPI, HTTPException, Depends, Response, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
+from typing import Optional, List
+import sqlite3
+import secrets
+import string
+import time
+import bcrypt
+import os
+
+app = FastAPI(title="PasteBin Pro API")
+
+# ── MIDDLEWARE ──
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DB_PATH = "pastebin.db"
+BASE62_CHARS = string.ascii_letters + string.digits
+SESSION_EXPIRY = 86400 * 7
+
+# ── DATABASE ──
+def init_db():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    c = conn.cursor()
+    c.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            email TEXT UNIQUE,
+            password_hash TEXT,
+            created_at INTEGER,
+            avatar_color TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS pastes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            short_code TEXT UNIQUE,
+            title TEXT,
+            content TEXT,
+            language TEXT,
+            format TEXT,
+            visibility TEXT,
+            password_hash TEXT,
+            expiration INTEGER,
+            burn_after_read INTEGER,
+            views INTEGER DEFAULT 0,
+            user_id INTEGER,
+            created_at INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER,
+            expires_at INTEGER
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+def get_current_user(request: Request, db):
+    token = request.cookies.get("session_token")
+    if not token:
+        return None
+    now = int(time.time())
+    row = db.execute(
+        "SELECT u.* FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.token=? AND s.expires_at>?",
+        (token, now)
+    ).fetchone()
+    return dict(row) if row else None
+
+# ── SCHEMAS ──
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class PasteCreate(BaseModel):
+    title: str
+    content: str
+    language: str
+    format: str
+    visibility: str
+    password: Optional[str] = None
+    expiration: str
+    burn_after_read: bool
+    tags: List[str]
+
+# ── AUTH ──
+@app.post("/api/auth/register")
+async def register(body: RegisterRequest, db=Depends(get_db)):
+    try:
+        pw_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+        db.execute(
+            "INSERT INTO users (username,email,password_hash,created_at,avatar_color) VALUES (?,?,?,?,?)",
+            (body.username, body.email, pw_hash, int(time.time()), "#4f8ef7")
+        )
+        db.commit()
+        return {"status": "ok"}
+    except:
+        raise HTTPException(400, "User exists")
+
+@app.post("/api/auth/login")
+async def login(body: LoginRequest, response: Response, db=Depends(get_db)):
+    user = db.execute("SELECT * FROM users WHERE username=?", (body.username,)).fetchone()
+    if not user or not bcrypt.checkpw(body.password.encode(), user["password_hash"].encode()):
+        raise HTTPException(401, "Invalid credentials")
+
+    token = secrets.token_urlsafe(32)
+    expiry = int(time.time()) + SESSION_EXPIRY
+    db.execute("INSERT INTO sessions VALUES (?,?,?)", (token, user["id"], expiry))
+    db.commit()
+
+    response.set_cookie("session_token", token, httponly=True, max_age=SESSION_EXPIRY)
+    return {"message": "ok"}
+
+@app.get("/api/auth/me")
+async def me(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
+    return {"user": user}
+
+@app.post("/api/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie("session_token")
+    return {"message": "ok"}
+
+# ── CREATE PASTE ──
+@app.post("/api/paste")
+async def create_paste(body: PasteCreate, request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
+    code = ''.join(secrets.choice(BASE62_CHARS) for _ in range(8))
+    now = int(time.time())
+
+    expiry_map = {
+        "10m":600, "1h":3600, "1d":86400, "1w":604800,
+        "1month":2592000, "6months":15552000, "1y":31536000,
+        "never":None
+    }
+
+    expiry = now + expiry_map[body.expiration] if body.expiration in expiry_map and expiry_map[body.expiration] else None
+
+    pw_hash = None
+    if body.password:
+        pw_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+
+    db.execute("""
+        INSERT INTO pastes 
+        (short_code,title,content,language,format,visibility,password_hash,expiration,burn_after_read,user_id,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        code, body.title, body.content, body.language, body.format,
+        body.visibility, pw_hash, expiry,
+        1 if body.burn_after_read else 0,
+        user["id"] if user else None, now
+    ))
+    db.commit()
+
+    return {"short_code": code}
+
+# ── GET PASTE ──
+@app.get("/api/paste/{code}")
+async def get_paste(code: str, db=Depends(get_db)):
+    row = db.execute("SELECT * FROM pastes WHERE short_code=?", (code,)).fetchone()
+    if not row:
+        raise HTTPException(404)
+
+    paste = dict(row)
+    now = int(time.time())
+
+    # expiration
+    if paste["expiration"] and paste["expiration"] < now:
+        db.execute("DELETE FROM pastes WHERE short_code=?", (code,))
+        db.commit()
+        raise HTTPException(404, "Expired")
+
+    # 🔒 password lock
+    if paste["password_hash"]:
+        return {"locked": True, "title": paste["title"]}
+
+    # burn-after-read
+    if paste["burn_after_read"] and paste["views"] > 0:
+        db.execute("DELETE FROM pastes WHERE short_code=?", (code,))
+        db.commit()
+        raise HTTPException(404, "Burned")
+
+    db.execute("UPDATE pastes SET views=views+1 WHERE short_code=?", (code,))
+    db.commit()
+
+    return paste
+
+# ── UNLOCK ──
+@app.post("/api/paste/{code}/unlock")
+async def unlock_paste(code: str, data: dict, db=Depends(get_db)):
+    row = db.execute("SELECT * FROM pastes WHERE short_code=?", (code,)).fetchone()
+    if not row:
+        raise HTTPException(404)
+
+    paste = dict(row)
+
+    if not paste["password_hash"]:
+        return paste
+
+    if not bcrypt.checkpw(data["password"].encode(), paste["password_hash"].encode()):
+        raise HTTPException(401, "Wrong password")
+
+    if paste["burn_after_read"] and paste["views"] > 0:
+        db.execute("DELETE FROM pastes WHERE short_code=?", (code,))
+        db.commit()
+        raise HTTPException(404, "Burned")
+
+    db.execute("UPDATE pastes SET views=views+1 WHERE short_code=?", (code,))
+    db.commit()
+
+    return paste
+
+# ── PUBLIC ──
+@app.get("/api/public")
+async def get_public(page: int = 1, db=Depends(get_db)):
+    limit = 10
+    offset = (page - 1) * limit
+
+    rows = db.execute("""
+        SELECT short_code, title, language, views, created_at
+        FROM pastes
+        WHERE visibility = 'public'
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    """, (limit, offset)).fetchall()
+
+    total = db.execute("""
+        SELECT COUNT(*) as count FROM pastes WHERE visibility = 'public'
+    """).fetchone()["count"]
+
+    return {
+        "pastes": [dict(r) for r in rows],
+        "total": total,
+        "pages": max(1, (total + limit - 1) // limit)
+    }
+
+# ── SEARCH ──
+@app.get("/api/search")
+async def search(q: str, db=Depends(get_db)):
+    rows = db.execute("""
+        SELECT short_code,title,language,views,created_at
+        FROM pastes
+        WHERE visibility='public' AND (title LIKE ? OR content LIKE ?)
+        LIMIT 20
+    """, (f"%{q}%", f"%{q}%")).fetchall()
+
+    return {"results": [dict(r) for r in rows]}
+# ── USER PASTES ──
+# ── USER PASTES ──
+@app.get("/api/user/{username}/pastes")
+async def get_user_pastes(username: str, request: Request, db=Depends(get_db)):
+    user = db.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    if not user:
+        raise HTTPException(404, "User not found")
+    
+    user = dict(user)
+    current = get_current_user(request, db)
+    is_owner = current and current["id"] == user["id"]
+
+    if is_owner:
+        rows = db.execute("""
+            SELECT short_code, title, language, format, visibility,
+                   burn_after_read, views, created_at,
+                   SUBSTR(content, 1, 300) as preview
+            FROM pastes
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+        """, (user["id"],)).fetchall()
+    else:
+        rows = db.execute("""
+            SELECT short_code, title, language, format, visibility,
+                   burn_after_read, views, created_at,
+                   SUBSTR(content, 1, 300) as preview
+            FROM pastes
+            WHERE user_id = ? AND visibility IN ('public', 'unlisted')
+            ORDER BY created_at DESC
+        """, (user["id"],)).fetchall()
+
+    return {
+        "username": user["username"],
+        "avatar_color": user["avatar_color"],
+        "pastes": [dict(r) for r in rows]
+    }
+
+
+# ── RAW PASTE ──
+@app.get("/api/paste/{code}/raw")
+async def raw_paste(code: str, db=Depends(get_db)):
+    from fastapi.responses import PlainTextResponse
+    row = db.execute("SELECT content FROM pastes WHERE short_code=?", (code,)).fetchone()
+    if not row:
+        raise HTTPException(404)
+    return PlainTextResponse(row["content"])
+
+
+# ── DELETE PASTE ──
+@app.delete("/api/paste/{code}")
+async def delete_paste(code: str, request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        raise HTTPException(401, "Not authenticated")
+    row = db.execute("SELECT * FROM pastes WHERE short_code=?", (code,)).fetchone()
+    if not row:
+        raise HTTPException(404)
+    if dict(row)["user_id"] != user["id"]:
+        raise HTTPException(403, "Not your paste")
+    db.execute("DELETE FROM pastes WHERE short_code=?", (code,))
+    db.commit()
+    return {"status": "ok"}
+
+
+
+# ── FRONTEND ──
+@app.get("/{path:path}", response_class=HTMLResponse)
+async def frontend(path: str):
+    if path.startswith("api/"):
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    if os.path.exists("index.html"):
+        return HTMLResponse(open("index.html").read())
+
+    return HTMLResponse("index.html missing")
+
+# ── RUN ──
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
